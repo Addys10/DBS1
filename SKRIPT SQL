@@ -1,0 +1,312 @@
+-- predefined type, no DDL - MDSYS.SDO_GEOMETRY
+
+CREATE OR REPLACE TYPE typ_adresa AS OBJECT (
+    mesto         VARCHAR2(20),
+    ulice         VARCHAR2(30),
+    cislo_popisne NUMBER,
+    psc           VARCHAR2(9)
+) NOT FINAL;
+/
+
+CREATE OR REPLACE TYPE typ_kontakt AS OBJECT (
+    email VARCHAR2(300),
+    fax   VARCHAR2(200)
+) NOT FINAL;
+/
+
+CREATE OR REPLACE TYPE typ_pohlavi AS OBJECT (
+    rc VARCHAR2(15),
+    MEMBER FUNCTION pohlavi RETURN VARCHAR2
+) NOT FINAL;
+/
+
+CREATE OR REPLACE TYPE typ_vek AS OBJECT (
+    rc VARCHAR2(15),
+    MEMBER FUNCTION vek RETURN NUMBER
+) NOT FINAL;
+/
+
+-- predefined type, no DDL - XMLTYPE
+
+CREATE OR REPLACE TYPE kolekce_kontakt IS
+    TABLE OF VARCHAR2(20);
+/
+
+CREATE OR REPLACE TYPE kolekce_telefon IS
+    VARRAY(1) OF VARCHAR2(15);
+/
+
+CREATE TABLE autor (
+    id       NUMBER NOT NULL,
+    jmeno    VARCHAR2(20) NOT NULL,
+    prijmeni VARCHAR2(20) NOT NULL
+);
+
+ALTER TABLE autor ADD CONSTRAINT autor_pk PRIMARY KEY ( id );
+
+CREATE TABLE ctenar (
+    kod_ctenare VARCHAR2(7) NOT NULL,
+    jmeno       VARCHAR2(15) NOT NULL,
+    prijmeni    VARCHAR2(20) NOT NULL,
+    adresa      typ_adresa NOT NULL,
+    vek         typ_vek,
+    pohlavi     typ_pohlavi,
+    CHECK ( adresa.mesto IS NOT NULL ),
+    CHECK ( adresa.ulice IS NOT NULL ),
+    CHECK ( adresa.cislo_popisne IS NOT NULL ),
+    CHECK ( adresa.psc IS NOT NULL ),
+    CHECK ( vek.rc IS NOT NULL ),
+    CHECK ( pohlavi.rc IS NOT NULL )
+);
+
+ALTER TABLE ctenar ADD CONSTRAINT ctenar_pk PRIMARY KEY ( kod_ctenare );
+
+CREATE TABLE dodavatel (
+    id    NUMBER NOT NULL,
+    nazev VARCHAR2(30) NOT NULL,
+    typ   VARCHAR2(10) NOT NULL
+);
+
+ALTER TABLE dodavatel ADD CONSTRAINT dodavatel_pk PRIMARY KEY ( id );
+
+CREATE TABLE domaci (
+    id    NUMBER NOT NULL,
+    popis VARCHAR2(250) NOT NULL
+);
+
+ALTER TABLE domaci ADD CONSTRAINT domaci_pk PRIMARY KEY ( id );
+
+CREATE TABLE exemplar (
+    kod_exemplar NUMBER NOT NULL,
+    stav         VARCHAR2(15) NOT NULL,
+    kniha_isbn   NUMBER NOT NULL,
+    dodavatel_id NUMBER NOT NULL
+);
+
+ALTER TABLE exemplar ADD CONSTRAINT exemplar_pk PRIMARY KEY ( kod_exemplar );
+
+CREATE TABLE kniha (
+    isbn        NUMBER NOT NULL,
+    nazev       VARCHAR2(30) NOT NULL,
+    zanr        VARCHAR2(20) NOT NULL,
+    pocet_stran NUMBER,
+    autor_id    NUMBER NOT NULL
+);
+
+ALTER TABLE kniha ADD CONSTRAINT kniha_pk PRIMARY KEY ( isbn );
+
+CREATE TABLE knihovnik (
+    id            NUMBER NOT NULL,
+    jmeno         VARCHAR2(15) NOT NULL,
+    prijmeni      VARCHAR2(20) NOT NULL,
+    adresa        typ_adresa NOT NULL,
+    kontakt       kolekce_kontakt,
+    vek           typ_vek,
+    oblibeny_zanr VARCHAR2(20) NOT NULL,
+    CHECK ( adresa.mesto IS NOT NULL ),
+    CHECK ( adresa.ulice IS NOT NULL ),
+    CHECK ( adresa.cislo_popisne IS NOT NULL ),
+    CHECK ( adresa.psc IS NOT NULL ),
+    CHECK ( vek.rc IS NOT NULL )
+)
+NESTED TABLE kontakt 
+--  WARNING: Using column name as default storage_table name for nested column kontakt 
+ STORE AS kontakt;
+
+ALTER TABLE knihovnik ADD CONSTRAINT knihovnik_pk PRIMARY KEY ( id );
+
+CREATE TABLE sekretar (
+    id            NUMBER NOT NULL,
+    jmeno         VARCHAR2(15) NOT NULL,
+    prijmeni      VARCHAR2(20) NOT NULL,
+    adresa        typ_adresa NOT NULL,
+    kontakt       typ_kontakt,
+    vek           typ_vek,
+    oblibeny_zanr VARCHAR2(20),
+    telefon       kolekce_telefon,
+    CHECK ( adresa.mesto IS NOT NULL ),
+    CHECK ( adresa.ulice IS NOT NULL ),
+    CHECK ( adresa.cislo_popisne IS NOT NULL ),
+    CHECK ( adresa.psc IS NOT NULL ),
+    CHECK ( vek.rc IS NOT NULL ),
+    CHECK ( kontakt.email IS NOT NULL )
+);
+
+ALTER TABLE sekretar ADD CONSTRAINT sekretar_pk PRIMARY KEY ( id );
+
+CREATE TABLE vypujcka (
+    datum_vraceni         DATE NOT NULL,
+    ctenar_kod_ctenare    VARCHAR2(7) NOT NULL,
+    exemplar_kod_exemplar NUMBER NOT NULL,
+    knihovnik_id          NUMBER NOT NULL
+);
+
+CREATE TABLE zahranicni (
+    id    NUMBER NOT NULL,
+    popis VARCHAR2(250) NOT NULL
+);
+
+ALTER TABLE zahranicni ADD CONSTRAINT zahranicni_pk PRIMARY KEY ( id );
+
+CREATE TABLE zaznam (
+    kniha_isbn         NUMBER NOT NULL,
+    ctenar_kod_ctenare VARCHAR2(7) NOT NULL,
+    datum_rezervace    DATE NOT NULL,
+    sekretar_id        NUMBER NOT NULL
+);
+
+ALTER TABLE zaznam ADD CONSTRAINT zaznam_pk PRIMARY KEY ( kniha_isbn );
+
+ALTER TABLE domaci
+    ADD CONSTRAINT domaci_dodavatel_fk FOREIGN KEY ( id )
+        REFERENCES dodavatel ( id );
+
+ALTER TABLE exemplar
+    ADD CONSTRAINT exemplar_dodavatel_fk FOREIGN KEY ( dodavatel_id )
+        REFERENCES dodavatel ( id );
+
+ALTER TABLE exemplar
+    ADD CONSTRAINT exemplar_kniha_fk FOREIGN KEY ( kniha_isbn )
+        REFERENCES kniha ( isbn );
+
+ALTER TABLE kniha
+    ADD CONSTRAINT kniha_autor_fk FOREIGN KEY ( autor_id )
+        REFERENCES autor ( id );
+
+ALTER TABLE vypujcka
+    ADD CONSTRAINT vypujcka_ctenar_fk FOREIGN KEY ( ctenar_kod_ctenare )
+        REFERENCES ctenar ( kod_ctenare );
+
+ALTER TABLE vypujcka
+    ADD CONSTRAINT vypujcka_exemplar_fk FOREIGN KEY ( exemplar_kod_exemplar )
+        REFERENCES exemplar ( kod_exemplar );
+
+ALTER TABLE vypujcka
+    ADD CONSTRAINT vypujcka_knihovnik_fk FOREIGN KEY ( knihovnik_id )
+        REFERENCES knihovnik ( id );
+
+ALTER TABLE zahranicni
+    ADD CONSTRAINT zahranicni_dodavatel_fk FOREIGN KEY ( id )
+        REFERENCES dodavatel ( id );
+
+ALTER TABLE zaznam
+    ADD CONSTRAINT zaznam_ctenar_fk FOREIGN KEY ( ctenar_kod_ctenare )
+        REFERENCES ctenar ( kod_ctenare );
+
+ALTER TABLE zaznam
+    ADD CONSTRAINT zaznam_kniha_fk FOREIGN KEY ( kniha_isbn )
+        REFERENCES kniha ( isbn );
+
+ALTER TABLE zaznam
+    ADD CONSTRAINT zaznam_sekretar_fk FOREIGN KEY ( sekretar_id )
+        REFERENCES sekretar ( id );
+
+CREATE OR REPLACE TYPE BODY typ_pohlavi AS
+    MEMBER FUNCTION pohlavi RETURN VARCHAR2 AS
+        a VARCHAR2(10);
+        b VARCHAR2(10);
+    BEGIN
+        a := 'MUZ';
+        b := substr(rodne_cislo, 3, 2);
+        IF b > '50' THEN
+            a := 'ZENA';
+        END IF;
+        RETURN a;
+    END pohlavi;
+
+END;
+/
+
+CREATE OR REPLACE TYPE BODY typ_vek AS
+    MEMBER FUNCTION vek RETURN NUMBER AS
+
+        a     VARCHAR2(10);
+        b     VARCHAR2(10);
+        c     VARCHAR2(10);
+        b1    NUMBER;
+        stari NUMBER;
+    BEGIN
+        a := substr(rc, 1, 2);
+        IF a > '22' THEN
+            a := '19' || a;
+        ELSE
+            a := '20' || a;
+        END IF;
+
+        b := substr(rc, 3, 2);
+        IF b > '50' THEN
+            b1 := to_number(b) - 50;
+            b := to_char(b1);
+        END IF;
+
+        c := substr(rc, 5, 2);
+        stari := round((sysdate - to_date(b
+                                          || '/'
+                                          || c
+                                          || '/'
+                                          || a)) / 365, 5);
+
+        RETURN stari;
+    END vek;
+
+END;
+/
+
+CREATE OR REPLACE TRIGGER fkntm_vypujcka BEFORE
+    UPDATE OF ctenar_kod_ctenare ON vypujcka
+BEGIN
+    raise_application_error(-20225, 'Non Transferable FK constraint  on table Vypujcka is violated');
+END;
+/
+
+CREATE OR REPLACE TRIGGER arc_zahranicnidomaci_domaci BEFORE
+    INSERT OR UPDATE OF id ON domaci
+    FOR EACH ROW
+DECLARE
+    d NUMBER;
+BEGIN
+    SELECT
+        a.id
+    INTO d
+    FROM
+        dodavatel a
+    WHERE
+        a.id = :new.id;
+
+    IF ( d IS NULL OR d <> 1 ) THEN
+        raise_application_error(-20223, 'FK Domaci_Dodavatel_FK in Table Domaci violates Arc constraint on Table Dodavatel - discriminator column id doesn''t have value 1');
+    END IF;
+
+EXCEPTION
+    WHEN no_data_found THEN
+        NULL;
+    WHEN OTHERS THEN
+        RAISE;
+END;
+/
+
+CREATE OR REPLACE TRIGGER arc_zahranicnidomac_zahranicni BEFORE
+    INSERT OR UPDATE OF id ON zahranicni
+    FOR EACH ROW
+DECLARE
+    d NUMBER;
+BEGIN
+    SELECT
+        a.id
+    INTO d
+    FROM
+        dodavatel a
+    WHERE
+        a.id = :new.id;
+
+    IF ( d IS NULL OR d <> 1 ) THEN
+        raise_application_error(-20223, 'FK Zahranicni_Dodavatel_FK in Table Zahranicni violates Arc constraint on Table Dodavatel - discriminator column id doesn''t have value 1');
+    END IF;
+
+EXCEPTION
+    WHEN no_data_found THEN
+        NULL;
+    WHEN OTHERS THEN
+        RAISE;
+END;
+/
